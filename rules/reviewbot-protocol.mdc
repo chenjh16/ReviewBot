@@ -1,0 +1,52 @@
+---
+description: Use this rule to notify the user of your plan or progress, and to request user review when completing a task or needing a decision
+globs: "*.*"
+alwaysApply: true
+---
+
+# ReviewBot Protocol
+
+Communicate with the user and collect human review feedback via the ReviewBot skill. For detailed usage, see the ReviewBot Skill (`<SKILL_DIR>/SKILL.md`).
+
+> `<SKILL_DIR>` = `~/.cursor/skills/reviewbot/`
+
+## When to Trigger
+
+1. **Task start**: Notify the user of your plan via `/send` (one-way, no reply expected)
+2. **During execution**: Send intermediate progress via `/send` (up to 3 times, one-way)
+3. **When a user decision is needed**: Submit a review request via `review-client.mjs`, which blocks until feedback is received
+4. **Task completion**: Submit a final review request via `review-client.mjs`, which blocks until feedback is received
+5. **After receiving feedback**: If user says "任务完成", end the task. Otherwise, continue working based on feedback and submit another review when done
+
+## Quick Reference
+
+```bash
+# 1. Check service status
+PORT=$(cat <SKILL_DIR>/.port) && curl -s http://127.0.0.1:$PORT/status
+
+# 2. Send a notification (no reply expected)
+curl -s -X POST http://127.0.0.1:$PORT/send \
+ -H 'Content-Type: application/json' \
+ -d '{"message": "...", "format": "markdown", "agent_id": "'"$(basename $PWD)"'"}'
+
+# 3. Submit a review request (blocks until feedback)
+node <SKILL_DIR>/review-client.mjs --summary "Task summary in Chinese" --timeout 600
+```
+
+## Key Rules
+
+- **You MUST submit a review request before completing a task** — never skip review and end the task directly
+- **You may only truly end a task when the user explicitly replies "任务完成" (task complete)**. Until then, continue working based on user feedback and submit another review
+- **If you fail to receive user feedback (timeout, error, or any failure), you MUST retry** — call `review-client.mjs` again with `--summary` to keep waiting. Never end a task without successfully receiving feedback.
+- `summary` **must be written in Chinese**
+- Message format is determined by content (see format selection rules in the Skill documentation)
+- QQ Markdown code blocks **must include a language tag** (e.g., ` ```text `), otherwise they won't render
+- On `timeout_retry`, call `review-client.mjs` again (with `--summary`) to continue waiting
+- When feedback contains `attachments`, use the `Read` tool to view image files at the provided absolute paths
+
+## CRITICAL: No Subagents
+
+- **NEVER use the Task tool or any subagent mechanism.** All work MUST be performed directly by the main agent.
+- Subagents (generalPurpose, explore, shell, best-of-n-runner, etc.) are **strictly prohibited** in this project.
+- Do NOT delegate any content generation, code writing, file creation, or analysis to subagents.
+- If a task is large, break it into sequential steps and execute them yourself — do NOT spawn child agents.

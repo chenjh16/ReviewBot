@@ -1,0 +1,52 @@
+---
+description: Use this rule to notify the user of your plan or progress, and to request user review when completing a task or needing a decision
+globs: "*.*"
+alwaysApply: true
+---
+
+# ReviewBot Protocol
+
+通过 ReviewBot 技能与用户沟通，获取人工审查反馈。详细用法请参考 ReviewBot Skill（`<SKILL_DIR>/SKILL.md`）。
+
+> `<SKILL_DIR>` = `~/.cursor/skills/reviewbot/`
+
+## 何时触发
+
+1. **任务开始时**：通过 `/send` 通知用户你的计划（单向，不等回复）
+2. **执行过程中**：通过 `/send` 发送中间进展（≤3 次，单向通知）
+3. **需要用户决策时**：通过 `review-client.mjs` 提交 review request，阻塞等待反馈
+4. **任务完成时**：通过 `review-client.mjs` 提交最终 review request，阻塞等待反馈
+5. **收到反馈后**：若用户回复"任务完成"则结束任务；否则根据反馈继续工作，完成后再次提交 review
+
+## 快速参考
+
+```bash
+# 1. 检查服务
+PORT=$(cat <SKILL_DIR>/.port) && curl -s http://127.0.0.1:$PORT/status
+
+# 2. 发送中间消息（无需等待回复）
+curl -s -X POST http://127.0.0.1:$PORT/send \
+ -H 'Content-Type: application/json' \
+ -d '{"message": "...", "format": "markdown", "agent_id": "'"$(basename $PWD)"'"}'
+
+# 3. 提交 review（阻塞等待反馈）
+node <SKILL_DIR>/review-client.mjs --summary "中文任务总结" --timeout 600
+```
+
+## 关键规则
+
+- **必须在任务完成前发起 review request**，不得跳过 review 直接结束任务
+- **只有当用户明确回复"任务完成"时，才能真正结束当前任务**。在此之前，请根据反馈继续工作，完成后再次提交 review
+- **如果未能收到用户反馈（超时、错误或任何失败），必须重试** — 再次调用 `review-client.mjs`（需带 `--summary`）继续等待。绝不可在未成功收到反馈的情况下结束任务。
+- `summary` **必须使用中文**
+- 消息格式由内容决定（详见 Skill 文档中的格式选择规则）
+- QQ Markdown 代码块**必须带语言标记**（如 ` ```text `），否则不渲染
+- `timeout_retry` 时再次调用 `review-client.mjs`（需带 `--summary`）继续等待
+- 当反馈包含 `attachments` 时，使用 `Read` 工具通过提供的绝对路径查看图片文件
+
+## 重要：禁止使用 Subagent
+
+- **严禁使用 Task 工具或任何 subagent 机制。** 所有工作必须由主 agent 直接执行。
+- Subagent（generalPurpose、explore、shell、best-of-n-runner 等）在本项目中**严格禁止**。
+- 不得将任何内容生成、代码编写、文件创建或分析委派给 subagent。
+- 如果任务较大，请分步顺序执行 — 不要产生子 agent。

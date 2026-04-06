@@ -1,0 +1,22 @@
+{
+  "name": "reviewbot",
+  "version": "1.0.0",
+  "description": "Human-in-the-loop review service for AI coding agents via Feishu and QQ Bot",
+  "type": "module",
+  "scripts": {
+    "start": "node reviewbot-server.mjs",
+    "review": "node review-client.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:unit": "node --test test/cards.test.mjs test/qq.test.mjs test/render.test.mjs test/stall.test.mjs test/http.test.mjs",
+    "test:e2e": "node --test test/e2e-api.test.mjs"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.60.0",
+    "marked": "^17.0.0",
+    "puppeteer-core": "^24.0.0",
+    "ws": "^8.20.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
